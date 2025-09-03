@@ -10,7 +10,7 @@ from django.contrib.auth import authenticate, login, logout
 
 from apps.empresa.models import UserCompanyIndex
 from apps.empleados.models import Employee
-from apps.usuarios.serializers import UserSerializer
+from apps.usuarios.api.v1.serializers import UserSerializer
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]

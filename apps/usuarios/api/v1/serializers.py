@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from apps.empresa.models import Company
-from .models import UserRole, User
+from ...models import UserRole, User
 
 
 # ──────────────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django_tenants.utils import schema_context, get_public_schema_name
 from apps.utils.auditlogmimix import AuditLogMixin
-from .models import Company
+from ...models import Company
 from .serializers import CompanySerializer
 from django.db.models.deletion import ProtectedError
 from django.db import connection

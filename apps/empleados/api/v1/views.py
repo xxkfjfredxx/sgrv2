@@ -10,7 +10,7 @@ from django.core.exceptions import PermissionDenied
 
 from apps.utils.auditlogmimix import AuditLogMixin
 
-from .models import Employee
+from ...models import Employee
 from .serializers import (
     EmployeeSerializer
 )

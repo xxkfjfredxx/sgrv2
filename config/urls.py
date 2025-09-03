@@ -7,12 +7,12 @@ from drf_spectacular.views import (
     SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 )
 
-from config.views_api import urlpatterns as api_urls
+from .urls_v1 import urlpatterns as api_urls
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/", include(api_urls)),
-    path("api/", include("apps.usuarios.urls")),
+    path("api/v1/", include(api_urls)),
+    path("api/", include("apps.usuarios.api.v1.urls")),
     path("jet/dashboard/", include("jet.dashboard.urls", "jet-dashboard")),
     path("jet/", include("jet.urls", namespace="jet")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),

@@ -1,7 +1,7 @@
 from rest_framework import viewsets, filters, status
-from .models import User, UserRole
+from ...models import User, UserRole
 from .serializers import UserSerializer, UserRoleSerializer
-from .permissions import EsRolPermitido
+from ...permissions import EsRolPermitido
 from apps.utils.auditlogmimix import AuditLogMixin
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.decorators import action
