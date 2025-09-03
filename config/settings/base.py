@@ -35,7 +35,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # Application definition
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
@@ -44,7 +44,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.DefaultPagination",
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
-    ],
+    ],    
 } 
 
 REST_FRAMEWORK.update({
@@ -75,6 +75,8 @@ SHARED_APPS = [
     "apps.empresa",
     "apps.usuarios",
     "drf_spectacular",
+    "debug_toolbar",
+    "oauth2_provider",
 ]
 
 INSTALLED_APPS = list(SHARED_APPS) + [
@@ -91,6 +93,7 @@ MIDDLEWARE = [
     "apps.utils.middleware.TenantMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 
 # Aquí le indicas a Django que use tu router de multitenant

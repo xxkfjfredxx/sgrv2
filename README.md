@@ -108,3 +108,6 @@ Accede en tu navegador a: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
 ✅ **Listo para trabajar o continuar desarrollando tu sistema.**  
 Para dudas o mejoras, crea un issue o contáctame.
+
+
+el proyecto tambien tiene auth o2 celery y debug_toolbar
