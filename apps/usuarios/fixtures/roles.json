@@ -1,0 +1,152 @@
+[
+  {
+    "model": "usuarios.userrole",
+    "pk": 1,
+    "fields": {
+      "name": "Admin",
+      "description": "Super Admin Role",
+      "permissions": {},
+      "is_active": true,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "empresa.company",
+    "pk": 1,
+    "fields": {
+      "name": "Constructora XYZ",
+      "nit": "900123456",
+      "address": "Calle 123",
+      "phone": "123456789",
+      "email": "contacto@xyz.com",
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "usuarios.user",
+    "pk": 1,
+    "fields": {
+      "username": "admin",
+      "password": "pbkdf2_sha256$870000$IUUBTc7xS8gfMz907VZxLj$1Yynsgw4ZrKMRFe2jhA7DVOYdDQ2RpfTRLoKnOm0qiM=",
+      "email": "admin@gmain.com",
+      "first_name": "Fred",
+      "last_name": "Rueda",
+      "is_active": true,
+      "is_staff": true,
+      "is_superuser": true,
+      "role": 1,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "empleados.employee",
+    "pk": 1,
+    "fields": {
+      "user": 1,
+      "document": "1098765432",
+      "first_name": "Carolina",
+      "last_name": "Rueda",
+      "gender": "Female",
+      "birth_date": "1992-01-01",
+      "phone_contact": "3123456789",
+      "address": "Barrio Nuevo",
+      "socioeconomic_stratum": 4,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "empleados.documenttype",
+    "pk": 1,
+    "fields": {
+      "name": "Cédula",
+      "code": "CEDULA",
+      "requires_expiration": false,
+      "default_expiry_months": null,
+      "category": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "empleados.documenttype",
+    "pk": 2,
+    "fields": {
+      "name": "CV",
+      "code": "CV",
+      "requires_expiration": false,
+      "default_expiry_months": null,
+      "category": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "empleados.documenttype",
+    "pk": 3,
+    "fields": {
+      "name": "Contrato",
+      "code": "CONTRATO",
+      "requires_expiration": false,
+      "default_expiry_months": null,
+      "category": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "empleados.documenttype",
+    "pk": 4,
+    "fields": {
+      "name": "Certificación",
+      "code": "CERTIFICACION",
+      "requires_expiration": true,
+      "default_expiry_months": null,
+      "category": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "empleados.documenttype",
+    "pk": 5,
+    "fields": {
+      "name": "Afiliación EPS/ARL",
+      "code": "AFILIACION_EPS_ARL",
+      "requires_expiration": false,
+      "default_expiry_months": null,
+      "category": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "empleados.documenttype",
+    "pk": 6,
+    "fields": {
+      "name": "Licencia",
+      "code": "LICENCIA",
+      "requires_expiration": true,
+      "default_expiry_months": null,
+      "category": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  },
+  {
+    "model": "empleados.documenttype",
+    "pk": 7,
+    "fields": {
+      "name": "Otro",
+      "code": "OTRO",
+      "requires_expiration": false,
+      "default_expiry_months": null,
+      "category": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z"
+    }
+  }
+]
