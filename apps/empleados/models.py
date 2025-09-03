@@ -11,14 +11,6 @@ class Employee(AuditMixin, models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )
-    contractor = models.ForeignKey(
-        'contratistas.ContractorCompany',
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="employees",
-        help_text="Solo si es empleado de un contratista",
-    )
     document = models.CharField(max_length=20, unique=True)
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
@@ -107,22 +99,9 @@ class EmployeeDocument(AuditMixin, models.Model):
         "empleados.Employee", on_delete=models.CASCADE, related_name="documents"
     )
     document_type = models.ForeignKey("DocumentType", on_delete=models.PROTECT)
-
-    absence = models.ForeignKey(
-        "ausentismo.Absence",
-        on_delete=models.CASCADE,
-        blank=True,
-        null=True,
-        related_name="support_docs",
-    )
-
     file = models.FileField(upload_to=document_upload_path)
-
     company = models.ForeignKey(
         "empresa.Company", null=True, blank=True, on_delete=models.SET_NULL
-    )
-    employment_link = models.ForeignKey(
-        "vinculaciones.EmploymentLink", null=True, blank=True, on_delete=models.SET_NULL
     )
     is_global = models.BooleanField(default=False)
 

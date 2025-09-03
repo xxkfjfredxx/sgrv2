@@ -9,7 +9,6 @@ from django.db import models
 from django.core.exceptions import PermissionDenied
 
 from apps.utils.auditlogmimix import AuditLogMixin
-from apps.vinculaciones.models import EmploymentLink
 
 from .models import Employee, DocumentType, EmployeeDocument, DocumentCategory
 from .serializers import (
@@ -58,15 +57,7 @@ class EmployeeViewSet(BaseAuditViewSet):
         # 2) Compatibilidad con tu filtro original por EmploymentLink, PERO sin abrir datos de otras compañías.
         #    Si viene ?company=..., solo lo respetamos si coincide con la activa o si el usuario es superuser.
         company_param = self.request.query_params.get("company")
-        if company_param:
-            try:
-                cid = int(company_param)
-                if cid == active_company.id or self.request.user.is_superuser:
-                    qs = qs.filter(employmentlink__company_id=cid).distinct()
-                # si no coincide y no es superuser, ignoramos el parámetro para evitar fuga de datos
-            except ValueError:
-                pass
-
+        
         # 3) Filtros por nombre/documento (tus originales)
         if name := self.request.query_params.get("name"):
             qs = qs.filter(models.Q(first_name__icontains=name) | models.Q(last_name__icontains=name))

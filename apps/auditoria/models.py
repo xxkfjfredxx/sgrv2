@@ -1,7 +1,6 @@
 from django.db import models
 from apps.empresa.models import Company
 from apps.usuarios.models import User
-from apps.acciones_correctivas.models import ActionItem
 from apps.utils.mixins import AuditMixin
 
 class SystemAudit(models.Model):
@@ -115,13 +114,6 @@ class AuditFinding(AuditMixin, models.Model):
     )
     closing_evidence = models.FileField(
         upload_to="audit_findings_closing/", blank=True, null=True
-    )
-    action_item = models.ForeignKey(
-        ActionItem,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        help_text="Acción correctiva asociada (si aplica)",
     )
 
     class Meta:

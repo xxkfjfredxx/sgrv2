@@ -6,8 +6,6 @@ from .models import (
     DocumentType,
     DocumentCategory,
 )
-from apps.capacitaciones.models import TrainingSessionAttendance
-from apps.salud_ocupacional.models import MedicalExam
 from datetime import date
 
 
@@ -65,22 +63,6 @@ class EmployeeSerializer(serializers.ModelSerializer):
         else:
             print("No active company found in serializer!")
         return super().create(validated_data)
-
-    def get_course_expirations(self, obj):
-        cursos = (
-            TrainingSessionAttendance.objects.filter(
-                employee=obj, session__date__gte=date.today()
-            )
-            .select_related("session")
-            .order_by("session__date")[:3]
-        )
-        return [{"name": c.session.topic, "expires_on": c.session.date} for c in cursos]
-
-    def get_exam_expirations(self, obj):
-        examenes = MedicalExam.objects.filter(
-            employee=obj, date__gte=date.today()
-        ).order_by("date")[:3]
-        return [{"type": e.exam_type, "expires_on": e.date} for e in examenes]
 
 
 class EmployeeDocumentSerializer(serializers.ModelSerializer):

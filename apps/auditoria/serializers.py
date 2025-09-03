@@ -7,7 +7,6 @@ from .models import (
     AuditResult,
     AuditFinding,
 )
-from apps.acciones_correctivas.serializers import ActionItemSerializer
 
 
 class SystemAuditSerializer(serializers.ModelSerializer):
@@ -41,14 +40,5 @@ class AuditExecutionSerializer(serializers.ModelSerializer):
 class AuditResultSerializer(serializers.ModelSerializer):
     class Meta:
         model = AuditResult
-        fields = "__all__"
-        read_only_fields = ("created_at", "created_by")
-
-
-class AuditFindingSerializer(serializers.ModelSerializer):
-    action_item = ActionItemSerializer(read_only=True)
-
-    class Meta:
-        model = AuditFinding
         fields = "__all__"
         read_only_fields = ("created_at", "created_by")

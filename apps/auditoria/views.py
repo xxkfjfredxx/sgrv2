@@ -19,7 +19,6 @@ from .serializers import (
     AuditItemSerializer,
     AuditExecutionSerializer,
     AuditResultSerializer,
-    AuditFindingSerializer,
 )
 
 
@@ -113,7 +112,7 @@ class AuditResultViewSet(AuditLogMixin, viewsets.ModelViewSet):
 
 class AuditFindingViewSet(AuditLogMixin, viewsets.ModelViewSet):
     queryset = AuditFinding.objects.filter(is_deleted=False)
-    serializer_class = AuditFindingSerializer
+    
     permission_classes = [AllowAny]
 
     def get_queryset(self):
