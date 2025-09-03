@@ -10,12 +10,9 @@ from django.core.exceptions import PermissionDenied
 
 from apps.utils.auditlogmimix import AuditLogMixin
 
-from .models import Employee, DocumentType, EmployeeDocument, DocumentCategory
+from .models import Employee
 from .serializers import (
-    EmployeeSerializer,
-    DocumentTypeSerializer,
-    EmployeeDocumentSerializer,
-    DocumentCategorySerializer,
+    EmployeeSerializer
 )
 
 
@@ -66,47 +63,3 @@ class EmployeeViewSet(BaseAuditViewSet):
             qs = qs.filter(document__icontains=doc)
 
         return qs.distinct()
-
-
-class EmployeeDocumentViewSet(BaseAuditViewSet):
-    serializer_class = EmployeeDocumentSerializer
-    parser_classes = [MultiPartParser, FormParser]
-
-    def get_queryset(self):
-        if not hasattr(self.request, "active_company") or self.request.active_company is None:
-            raise PermissionDenied("No se encontró la compañía activa en la solicitud")
-
-        qs = EmployeeDocument.objects.filter(
-            is_deleted=False,
-            employee__company=self.request.active_company
-        )
-
-        if emp := self.request.query_params.get("employee"):
-            qs = qs.filter(employee_id=emp)
-
-        if dtype := self.request.query_params.get("document_type"):
-            qs = qs.filter(document_type_id=dtype)
-
-        # Si quieres seguir aceptando ?company=... aquí también, aplica la misma regla de seguridad:
-        # company_param = self.request.query_params.get("company")
-        # if company_param and (str(company_param) == str(self.request.active_company.id) or self.request.user.is_superuser):
-        #     qs = qs.filter(company_id=company_param)
-
-        return qs
-
-
-class DocumentCategoryViewSet(BaseAuditViewSet):
-    queryset = DocumentCategory.objects.filter(is_deleted=False)
-    serializer_class = DocumentCategorySerializer
-    http_method_names = ["get", "head", "options"]
-
-
-class DocumentTypeViewSet(BaseAuditViewSet):
-    serializer_class = DocumentTypeSerializer
-    http_method_names = ["get", "head", "options"]
-
-    def get_queryset(self):
-        qs = DocumentType.objects.filter(is_deleted=False)
-        if cat := self.request.query_params.get("category"):
-            qs = qs.filter(category_id=cat)
-        return qs
