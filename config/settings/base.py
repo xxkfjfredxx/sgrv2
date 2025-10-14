@@ -1,8 +1,12 @@
-from corsheaders.defaults import default_headers
-
-from pathlib import Path
 import os
-
+import sentry_sdk
+from corsheaders.defaults import default_headers
+from pathlib import Path
+from dotenv import load_dotenv
+# Carga las variables de entorno del archivo .env
+load_dotenv() 
+SECRET_KEY = os.getenv("SECRET_KEY")
+FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY")
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -20,9 +24,15 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-l1dic@kwue(gya7ugcucsrnmo&12fkyn$k$=@o9n=_j2%lh2py"
 
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
+
+# SECURITY WARNING: keep the secret key used in production secret!
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
@@ -39,7 +49,7 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+        "rest_framework.permissions.AllowAny",#AllowAny IsAuthenticated
     ],
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.DefaultPagination",
     "DEFAULT_FILTER_BACKENDS": [
@@ -54,8 +64,9 @@ REST_FRAMEWORK.update({
 TENANT_APPS = [
     "apps.auditoria",
     "apps.empleados.apps.EmpleadosConfig",
+    "apps.categoriadocumentos",
+    "apps.expedientesdigitales",
 ]
-
 
 SHARED_APPS = [
     "django_tenants",
@@ -71,9 +82,10 @@ SHARED_APPS = [
     "rest_framework",
     "corsheaders",
     "django_filters",
-    "apps.utils", 
-    "apps.empresa",
+    "apps.utils",
+    "apps.empresa.apps.EmpresaConfig",   # ← usa AppConfig para cargar signals
     "apps.usuarios",
+    # "apps.roles",                      # ← quítalo si no lo usas
     "drf_spectacular",
     "debug_toolbar",
     "oauth2_provider",
@@ -84,17 +96,17 @@ INSTALLED_APPS = list(SHARED_APPS) + [
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",              # ← arriba del todo
     "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "apps.utils.middleware.TenantMiddleware",
+    "apps.utils.middleware.TenantMiddleware",            # ← después de Auth, como lo tienes
     "django_ratelimit.middleware.RatelimitMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
+    "debug_toolbar.middleware.DebugToolbarMiddleware",   # ← al final
 ]
 
 # Aquí le indicas a Django que use tu router de multitenant
@@ -162,6 +174,7 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_PERMISSIONS": ["rest_framework.permissions.AllowAny"],   # ✅ doc pública
     "SERVE_AUTHENTICATION": [],                                     # ✅ sin auth en doc
+    "GROUP_BY_URL": True,
 }
 # Internationalization
 # https://docs.djangoproject.com/en/5.1/topics/i18n/

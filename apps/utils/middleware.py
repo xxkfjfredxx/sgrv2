@@ -1,71 +1,133 @@
 from django.utils.deprecation import MiddlewareMixin
-from rest_framework.authentication import TokenAuthentication
-from rest_framework.exceptions import AuthenticationFailed
 from django.core.exceptions import PermissionDenied
-from apps.empresa.models import Company
+from rest_framework.exceptions import AuthenticationFailed
 from django_tenants.utils import tenant_context
+from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+import logging
+
+from apps.empresa.models import Company
+
+try:
+    from oauth2_provider.contrib.rest_framework import OAuth2Authentication
+except Exception:
+    OAuth2Authentication = None
+
+logger = logging.getLogger(__name__)
 
 
 class TenantMiddleware(MiddlewareMixin):
-    # Rutas que NO deben pasar por la lógica de tenant/auth estricta
+    # Public endpoints (stay in public schema, no tenant_context)
     EXEMPT_PATHS = (
-        "/api/schema",               # JSON (con o sin barra final)
+        "/api/auth/login",
+        "/api/auth/otp/request",
+        "/api/auth/otp/verify",
+        "/api/schema",
         "/api/schema/",
         "/api/schema/swagger-ui/",
         "/api/schema/redoc/",
-        "/api-auth/",                # DRF login/logout por sesión
-        "/api/login/",
-        "/api/logout/",
+    )
+
+    # Admin-only endpoints that operate in public schema
+    ADMIN_PUBLIC_PATHS = (
+        "/api/admin/companies",
+        "/api/admin/users",
     )
 
     def process_request(self, request):
-        print("Verificando el middleware: Proceso de asignación de compañía activa")
-
-        # Solo aplica a rutas /api/
         if not request.path.startswith("/api/"):
             return
-
-        # Preflight CORS
         if request.method == "OPTIONS":
             return
-
-        # Excepciones (doc pública, auth por sesión, login/logout)
         if any(request.path.startswith(p) for p in self.EXEMPT_PATHS):
             return
 
-        # --- Autenticación por Token (igual que tu lógica actual) ---
-        try:
-            user_auth_tuple = TokenAuthentication().authenticate(request)
-            if user_auth_tuple is not None:
-                request.user, request.auth = user_auth_tuple
-        except AuthenticationFailed:
-            raise PermissionDenied("Token inválido o expirado")
-
-        # Debe estar autenticado a partir de aquí
-        user = getattr(request, "user", None)
+        user = self._authenticate_request_user(request)
         if not getattr(user, "is_authenticated", False):
-            raise PermissionDenied("Usuario no autenticado")
+            raise PermissionDenied("User not authenticated")
 
-        # --- Compañía activa desde header (misma lógica tuya) ---
-        company_id = request.headers.get("X-Active-Company")
-        if not company_id:
-            # Mantener comportamiento tuyo: si no viene header, no se cambia el schema.
-            return
+        if any(request.path.startswith(p) for p in self.ADMIN_PUBLIC_PATHS):
+            if not getattr(user, "is_superuser", False):
+                raise PermissionDenied("Admin required")
+            return  # public schema
 
-        if not company_id.isdigit():
-            raise PermissionDenied("X-Active-Company inválido")
+        header_company_id = request.headers.get("X-Active-Company")
+        user_company_id = getattr(user, "company_id", None)
+
+        if getattr(user, "is_superuser", False):
+            if not header_company_id:
+                return  # superuser in public
+            company_id = self._parse_company_id(header_company_id)
+        else:
+            if header_company_id:
+                header_id = self._parse_company_id(header_company_id)
+                if not user_company_id or header_id != user_company_id:
+                    raise PermissionDenied("Invalid company for this user")
+                company_id = header_id
+            else:
+                if not user_company_id:
+                    raise PermissionDenied("No active company")
+                company_id = user_company_id
 
         try:
-            company = Company.objects.get(pk=int(company_id))
+            company = Company.objects.get(pk=company_id)
         except Company.DoesNotExist:
-            raise PermissionDenied("Compañía no encontrada")
+            raise PermissionDenied("Company not found")
 
         request.tenant = company
-        request._tenant_context = tenant_context(company)
-        request._tenant_context.__enter__()
         request.active_company = company
+        ctx = tenant_context(company)
+        request._tenant_context = ctx
+        ctx.__enter__()
+
+    def process_exception(self, request, exception):
+        if hasattr(request, "_tenant_context"):
+            try:
+                request._tenant_context.__exit__(type(exception), exception, getattr(exception, "__traceback__", None))
+            finally:
+                delattr(request, "_tenant_context")
+        return None
 
     def process_response(self, request, response):
         if hasattr(request, "_tenant_context"):
-            request._tenant_context.__exit__(None, None, None)
+            try:
+                request._tenant_context.__exit__(None, None, None)
+            finally:
+                delattr(request, "_tenant_context")
         return response
+
+    # ---------- helpers ----------
+    def _authenticate_request_user(self, request):
+        if getattr(request, "user", None) and getattr(request.user, "is_authenticated", False):
+            return request.user
+
+        if OAuth2Authentication is not None:
+            try:
+                pair = OAuth2Authentication().authenticate(request)
+                if pair:
+                    request.user, request.auth = pair
+                    return request.user
+            except AuthenticationFailed:
+                pass
+
+        try:
+            pair = SessionAuthentication().authenticate(request)
+            if pair:
+                request.user, request.auth = pair
+                return request.user
+        except AuthenticationFailed:
+            pass
+
+        try:
+            pair = TokenAuthentication().authenticate(request)
+            if pair:
+                request.user, request.auth = pair
+                return request.user
+        except AuthenticationFailed:
+            pass
+
+        return getattr(request, "user", None)
+
+    def _parse_company_id(self, raw):
+        if not raw or not raw.isdigit():
+            raise PermissionDenied("Invalid X-Active-Company")
+        return int(raw)

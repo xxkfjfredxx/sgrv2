@@ -111,3 +111,42 @@ Para dudas o mejoras, crea un issue o contáctame.
 
 
 el proyecto tambien tiene auth o2 celery y debug_toolbar y pip install django-ratelimit 
+
+tambien se agrego encriptacion de campos
+from encrypted_model_fields.fields import EncryptedCharField, EncryptedDecimalField
+# Este campo se encriptará automáticamente
+    employee_id_number = EncryptedCharField(max_length=20)
+    
+    # Este campo también se encriptará automáticamente
+    salary = EncryptedDecimalField(max_digits=10, decimal_places=2)
+
+
+from dotenv import load_dotenv
+para almacenar claves en .env
+
+"NAME": os.getenv("DB_NAME", "sgr_db"),
+        "USER": os.getenv("DB_USER", "postgres"),
+        "PASSWORD": os.getenv("DB_PASSWORD", "root"),
+        "HOST": os.getenv("DB_HOST", "localhost"),
+        "PORT": os.getenv("DB_PORT", "5432"),
+
+
+Sentry : para monitoreo de errores de aplicaciones.
+pip install bandit para ver vulnerabilidades
+
+revisar 
+OSSEC : Para detección de intrusiones.  ELK Stack (Elasticsearch, Logstash, Kibana),Popular APM Tools:
+New Relic: Tracks response times, errors, and database queries.
+Datadog: Provides monitoring for services, logs, and infrastructure.
+Elastic APM: Integrates seamlessly with the ELK stack for centralized logging and monitoring.
+Monitoring with Prometheus and Grafana
+Kubernetes 
+pip install pybreaker
+Gremlin: Simulates attacks on your infrastructure.
+Chaos Mesh: Runs chaos experiments in Kubernetes.
+django-cachalot
+django-silk
+django-csp
+django-defender
+
+

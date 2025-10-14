@@ -5,6 +5,9 @@ from ...models import (
 )
 from datetime import date
 
+from drf_spectacular.utils import extend_schema_field
+from drf_spectacular.types import OpenApiTypes
+
 
 class EmployeeSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source="user.email", read_only=True)
@@ -18,6 +21,16 @@ class EmployeeSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             "company": {"required": False},
         }
+
+    @extend_schema_field(OpenApiTypes.OBJECT)  # o define una ListField con child si ya sabes el shape
+    def get_course_expirations(self, obj):
+        # TODO: implementa la lógica real si aplica
+        return {}
+
+    @extend_schema_field(OpenApiTypes.OBJECT)
+    def get_exam_expirations(self, obj):
+        # TODO: implementa la lógica real si aplica
+        return {}
 
     def create(self, validated_data):
         request = self.context.get("request")

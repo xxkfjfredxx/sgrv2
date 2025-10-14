@@ -1,37 +1,42 @@
-# apps/usuarios/views_auth.py
 from django.contrib.auth import authenticate, login, logout
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.authtoken.models import Token
 from django_tenants.utils import tenant_context
-from .serializers import UserSerializer
-from django.contrib.auth import authenticate, login, logout
 
-from apps.empresa.models import UserCompanyIndex
+from apps.empresa.models import UserCompanyIndex  # your public user->company index
 from apps.empleados.models import Employee
 from apps.usuarios.api.v1.serializers import UserSerializer
+
+from drf_spectacular.utils import extend_schema, OpenApiResponse, inline_serializer
+from rest_framework import serializers as drf_serializers
+from apps.usuarios.api.v1.serializers import LoginRequestSerializer, TokenResponseSerializer,LogoutResponseSerializer
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
 
+    @extend_schema(
+        request=LoginRequestSerializer,
+        responses={
+            200: TokenResponseSerializer,
+            400: OpenApiResponse(description="Email and password are required"),
+            401: OpenApiResponse(description="Invalid credentials"),
+        },
+        tags=["auth"]
+    )
     def post(self, request):
-        # 1️⃣ Autenticar en el esquema public
         email = request.data.get("email")
         password = request.data.get("password")
-        user = authenticate(request, email=email, password=password)
+        if not email or not password:
+            return Response({"detail": "Email and password are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = authenticate(request, username=email, password=password) or authenticate(request, email=email, password=password)
         if not user:
-            return Response(
-                {"detail": "Credenciales inválidas"},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
+            return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        tenant_id = None
-        company_name = None
-
-        # 2️⃣ Superuser → sin tenant
-        if user.is_superuser:
+        if getattr(user, "is_superuser", False):
             user_data = {
                 "id": user.id,
                 "email": user.email,
@@ -39,33 +44,25 @@ class LoginView(APIView):
                 "last_name": user.last_name,
                 "is_superuser": True,
             }
-
+            company_id = None
+            company_name = None
         else:
-            # 3️⃣ Usar índice público para resolver la company
             try:
                 idx = UserCompanyIndex.objects.get(user=user)
                 company = idx.company
             except UserCompanyIndex.DoesNotExist:
-                return Response(
-                    {"detail": "El usuario no tiene empresa asociada"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({"detail": "User has no associated company"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # 4️⃣ Entrar al schema tenant y cargar el Employee
             with tenant_context(company):
                 try:
-                    employee = Employee.objects.get(user=user)
+                    Employee.objects.get(user=user)
                 except Employee.DoesNotExist:
-                    return Response(
-                        {"detail": "El usuario no tiene un empleado asociado"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
+                    return Response({"detail": "User has no associated employee"}, status=status.HTTP_400_BAD_REQUEST)
 
-            tenant_id = str(company.id)
+            company_id = company.id
             company_name = company.name
             user_data = UserSerializer(user).data
 
-        # 5️⃣ Crear token, iniciar sesión y devolver respuesta
         Token.objects.filter(user=user).delete()
         token = Token.objects.create(user=user)
         login(request, user)
@@ -73,38 +70,40 @@ class LoginView(APIView):
         return Response({
             "token": token.key,
             "user": user_data,
-            "tenant_id": tenant_id,
+            "company_id": company_id,
             "company_name": company_name,
         }, status=status.HTTP_200_OK)
 
 
 class LogoutView(APIView):
-    """
-    POST /logout/  – Borra token y cierra sesión. Idempotente.
-    """
-
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = LogoutResponseSerializer
 
+    @extend_schema(
+        responses={200: LogoutResponseSerializer},  # Añadimos el serializer de respuesta
+        tags=["auth"]
+    )
     def post(self, request):
-        # 1️⃣ Elimina el token si existe
         Token.objects.filter(user=request.user).delete()
-
-        # 2️⃣ Cierra la sesión de Django
         logout(request)
-
-        # 3️⃣ Siempre responde 200 OK (idempotencia)
-        return Response(
-            {"message": "Sesión cerrada correctamente"},
-            status=status.HTTP_200_OK,
-        )
+        return Response({"message": "Logged out"}, status=status.HTTP_200_OK)
 
 
 class MeView(APIView):
-    """
-    GET /me/  – Devuelve los datos del usuario autenticado.
-    """
-
     permission_classes = [permissions.IsAuthenticated]
 
+    @extend_schema(responses=UserSerializer, tags=["auth"])
     def get(self, request):
-        return Response(UserSerializer(request.user).data)
+        return Response(UserSerializer(request.user).data, status=status.HTTP_200_OK)
+
+
+# añade estos serializers (debajo de imports)
+class LoginRequestSerializer(drf_serializers.Serializer):
+    email = drf_serializers.EmailField()
+    password = drf_serializers.CharField()
+
+class TokenResponseSerializer(drf_serializers.Serializer):
+    token = drf_serializers.CharField()
+    user = UserSerializer()  # ya lo importas
+    company_id = drf_serializers.IntegerField(allow_null=True)
+    company_name = drf_serializers.CharField(allow_null=True, allow_blank=True)

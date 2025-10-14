@@ -1,65 +1,76 @@
-# apps/empleados/views.py
-from rest_framework import viewsets, status
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.filters import SearchFilter
-from django.db import models
-from django.core.exceptions import PermissionDenied
-
+from rest_framework import viewsets, filters
+from rest_framework.exceptions import ValidationError, PermissionDenied
+from django_filters.rest_framework import DjangoFilterBackend
+from django_tenants.utils import schema_context
 from apps.utils.auditlogmimix import AuditLogMixin
-
 from ...models import Employee
-from .serializers import (
-    EmployeeSerializer
-)
+from .serializers import EmployeeSerializer
+from apps.usuarios.models import User, UserRole
 
 
-class BaseAuditViewSet(AuditLogMixin, viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
-
-    @action(detail=True, methods=["post"])
-    def restore(self, request, pk=None):
-        obj = self.get_object()
-        obj.restore()
-        self.log_audit("RESTORED", obj)
-        return Response({"detail": "Registro restaurado."}, status=status.HTTP_200_OK)
-
-
-class EmployeeViewSet(BaseAuditViewSet):
+class EmployeeViewSet(AuditLogMixin, viewsets.ModelViewSet):
+    queryset = Employee.objects.select_related("user", "company").all()
     serializer_class = EmployeeSerializer
-    filter_backends = [SearchFilter]
-    search_fields = ["first_name", "last_name", "document", "user__email", "phone_contact"]
-
-    def get_serializer_context(self):
-        ctx = super().get_serializer_context()
-        if not hasattr(self.request, "active_company") or self.request.active_company is None:
-            raise PermissionDenied("No se encontró la compañía activa en la solicitud")
-        ctx["request"] = self.request
-        ctx["active_company"] = self.request.active_company
-        return ctx
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ["company", "user"]
+    search_fields = ["first_name", "last_name", "document"]
 
     def get_queryset(self):
-        # Base: siempre cerrar por la empresa activa (multitenant)
-        if not hasattr(self.request, "active_company") or self.request.active_company is None:
-            raise PermissionDenied("No se encontró la compañía activa en la solicitud")
-        active_company = self.request.active_company
+        qs = super().get_queryset()
+        active_company = getattr(self.request, "active_company", None)
+        if not active_company:
+            raise PermissionDenied("Active company not found.")
+        return qs.filter(company_id=active_company.id)
 
-        qs = Employee.objects.filter(is_deleted=False)
+    def perform_create(self, serializer):
+        active_company = getattr(self.request, "active_company", None)
+        if not active_company:
+            raise PermissionDenied("Active company not found.")
 
-        # 1) Cierre por compañía activa (si tu modelo Employee tiene FK company)
-        qs = qs.filter(company=active_company)
+        # Asegura que venga email en el payload del empleado
+        email = serializer.validated_data.get("email")
+        if not email:
+            raise ValidationError({"email": "This field is required."})
 
-        # 2) Compatibilidad con tu filtro original por EmploymentLink, PERO sin abrir datos de otras compañías.
-        #    Si viene ?company=..., solo lo respetamos si coincide con la activa o si el usuario es superuser.
-        company_param = self.request.query_params.get("company")
-        
-        # 3) Filtros por nombre/documento (tus originales)
-        if name := self.request.query_params.get("name"):
-            qs = qs.filter(models.Q(first_name__icontains=name) | models.Q(last_name__icontains=name))
+        # 1) Garantiza que exista un rol 'Employee' en PUBLIC para esta company
+        with schema_context("public"):
+            role_employee, _ = UserRole.objects.get_or_create(
+                company=active_company,
+                name="Employee",
+                defaults={"access_level": 1, "is_active": True},
+            )
 
-        if doc := self.request.query_params.get("document"):
-            qs = qs.filter(document__icontains=doc)
+            # 2) Crea/busca el usuario en PUBLIC
+            user = User.objects.filter(email=email).first()
+            if not user:
+                user = User(
+                    email=email,
+                    username=serializer.validated_data.get("document") or email.split("@")[0],
+                    first_name=serializer.validated_data.get("first_name", "") or "",
+                    last_name=serializer.validated_data.get("last_name", "") or "",
+                    company=active_company,
+                    role=role_employee,
+                    is_active=True,
+                    is_staff=False,
+                    is_superuser=False,
+                )
+                user.set_unusable_password()
+                user.save()
+            else:
+                # Si ya existe, debe pertenecer a la misma company
+                if user.company_id and user.company_id != active_company.id:
+                    raise ValidationError({"email": "Email already used in another company."})
+                # Completa datos mínimos si faltan
+                changed = False
+                if not user.company_id:
+                    user.company = active_company
+                    changed = True
+                if not user.role_id:
+                    user.role = role_employee
+                    changed = True
+                if changed:
+                    user.save()
 
-        return qs.distinct()
+        # 3) Crea el empleado en el TENANT y lo vincula al user
+        employee = serializer.save(company=active_company, user=user)
+        return employee

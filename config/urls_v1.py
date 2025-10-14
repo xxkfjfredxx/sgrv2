@@ -11,9 +11,12 @@ from apps.auditoria.api.v1.views import (
     SystemAuditViewSet
 )
 from apps.usuarios.api.v1.views import UserViewSet, UserRoleViewSet
+from apps.expedientesdigitales.api.v1.views import DigitalRecordViewSet
+from apps.categoriadocumentos.api.v1.views import DocumentCategoryViewSet
 
 router = DefaultRouter()
-
+router.register(r"digital-files", DigitalRecordViewSet, basename="digital-files")
+router.register(r"document-categories-types", DocumentCategoryViewSet, basename="document-categories-types")
 router.register(r"companies", CompanyViewSet, basename="companies")
 router.register(r"employees", EmployeeViewSet, basename="employees")
 router.register(r"users", UserViewSet)
