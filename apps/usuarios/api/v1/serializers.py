@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from apps.empresa.models import Company
 from ...models import UserRole, User
-
+from typing import Optional
 from drf_spectacular.utils import extend_schema_field
 from drf_spectacular.types import OpenApiTypes
 
@@ -39,8 +39,8 @@ class UserSerializer(serializers.ModelSerializer):
             "password": {"write_only": True, "required": True},
         }
 
-    @extend_schema_field(OpenApiTypes.INT)
-    def get_employee_id(self, obj):
+    @extend_schema_field(serializers.IntegerField(allow_null=True))
+    def get_employee_id(self, obj) -> Optional[int]:
         if obj.is_superuser:
             return None
         try:

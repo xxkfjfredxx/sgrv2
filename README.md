@@ -100,6 +100,9 @@ python manage.py createsuperuser
 ### 9️⃣ Ejecuta el servidor
 ```bash
 python manage.py runserver
+# Opción A (recomendada)
+python manage.py migrate
+python manage.py migrate_schemas --executor=standard
 ```
 
 Accede en tu navegador a: [http://127.0.0.1:8000](http://127.0.0.1:8000)
