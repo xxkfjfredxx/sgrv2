@@ -107,6 +107,8 @@ class LoginRequestSerializer(serializers.Serializer):
 
 # Respuesta del login (con token y datos del usuario)
 class TokenResponseSerializer(serializers.Serializer):
+    access = serializers.CharField(required=False, allow_blank=True)
+    refresh = serializers.CharField(required=False, allow_blank=True)
     token = serializers.CharField()
     user = UserSerializer()  # Usuario detallado usando su serializer
     company_id = serializers.IntegerField(allow_null=True)

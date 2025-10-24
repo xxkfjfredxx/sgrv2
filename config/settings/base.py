@@ -1,5 +1,6 @@
 import os
 import sentry_sdk
+from datetime import timedelta
 from corsheaders.defaults import default_headers
 from pathlib import Path
 from dotenv import load_dotenv
@@ -45,17 +46,19 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # Application definition
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "apps.usuarios.auth.VersionedJWTAuthentication",      # ⬅️ tu clase con verificación
+        "rest_framework.authentication.TokenAuthentication",   # legacy (si aún lo necesitas)
         "oauth2_provider.contrib.rest_framework.OAuth2Authentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.AllowAny",#AllowAny IsAuthenticated
+        "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.DefaultPagination",
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
-    ],    
-} 
+    ],
+}
 
 REST_FRAMEWORK.update({
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -89,6 +92,8 @@ SHARED_APPS = [
     "drf_spectacular",
     "debug_toolbar",
     "oauth2_provider",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
 ]
 
 INSTALLED_APPS = list(SHARED_APPS) + [
@@ -206,3 +211,11 @@ JET_APP_INDEX_DASHBOARD = "jet.dashboard.dashboard.DefaultAppIndexDashboard"
 CORS_ALLOW_ALL_ORIGINS = True
 TENANT_MODEL = "empresa.Company"
 TENANT_DOMAIN_MODEL = "empresa.Domain"
+
+# --- SimpleJWT ---
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}

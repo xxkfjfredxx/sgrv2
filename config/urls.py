@@ -10,6 +10,7 @@ from .urls_v1 import urlpatterns as api_urls
 # 👇 importa tus vistas de auth
 from apps.usuarios.api.v1.views_auth import LoginView, LogoutView, MeView
 from apps.usuarios.views_passwordless import RequestOTPView, VerifyOTPView
+from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -19,6 +20,7 @@ urlpatterns = [
     path("api/auth/login", LoginView.as_view(), name="auth-login"),
     path("api/auth/logout", LogoutView.as_view(), name="auth-logout"),
     path("api/auth/me", MeView.as_view(), name="auth-me"),
+    path("api/auth/refresh", TokenRefreshView.as_view(), name="auth-refresh"),
     path("api/auth/otp/request", RequestOTPView.as_view(), name="auth-otp-request"),
     path("api/auth/otp/verify", VerifyOTPView.as_view(), name="auth-otp-verify"),
 

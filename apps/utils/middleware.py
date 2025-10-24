@@ -3,6 +3,7 @@ from django.core.exceptions import PermissionDenied
 from rest_framework.exceptions import AuthenticationFailed
 from django_tenants.utils import tenant_context
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from apps.usuarios.auth import VersionedJWTAuthentication
 import logging
 
 from apps.empresa.models import Company
@@ -19,6 +20,7 @@ class TenantMiddleware(MiddlewareMixin):
     # Public endpoints (stay in public schema, no tenant_context)
     EXEMPT_PATHS = (
         "/api/auth/login",
+        "/api/auth/refresh",          # ⬅️ añadido
         "/api/auth/otp/request",
         "/api/auth/otp/verify",
         "/api/schema",
@@ -34,28 +36,39 @@ class TenantMiddleware(MiddlewareMixin):
     )
 
     def process_request(self, request):
+        # Deja que la vista maneje el logout sin interferir
+        if request.path.startswith("/api/auth/logout"):
+            return None
+
         if not request.path.startswith("/api/"):
-            return
+            return None
         if request.method == "OPTIONS":
-            return
+            return None
         if any(request.path.startswith(p) for p in self.EXEMPT_PATHS):
-            return
+            return None
 
+        # Autentica (JWT versionado -> Token legacy -> OAuth2)
         user = self._authenticate_request_user(request)
-        if not getattr(user, "is_authenticated", False):
-            raise PermissionDenied("User not authenticated")
 
+        # Si NO está autenticado, NO lances 403 aquí:
+        # deja que DRF responda 401 en la vista (IsAuthenticated).
+        if not getattr(user, "is_authenticated", False):
+            return None
+
+        # Endpoints admin que operan en public schema
         if any(request.path.startswith(p) for p in self.ADMIN_PUBLIC_PATHS):
             if not getattr(user, "is_superuser", False):
+                # Aquí sí corresponde 403: usuario autenticado pero sin permiso
                 raise PermissionDenied("Admin required")
-            return  # public schema
+            return None  # se queda en public schema
 
+        # Resolución de compañía/tenant
         header_company_id = request.headers.get("X-Active-Company")
         user_company_id = getattr(user, "company_id", None)
 
         if getattr(user, "is_superuser", False):
             if not header_company_id:
-                return  # superuser in public
+                return None  # superuser en public
             company_id = self._parse_company_id(header_company_id)
         else:
             if header_company_id:
@@ -73,11 +86,13 @@ class TenantMiddleware(MiddlewareMixin):
         except Company.DoesNotExist:
             raise PermissionDenied("Company not found")
 
+        # Entra al tenant context solo si hay usuario autenticado y compañía resuelta
         request.tenant = company
         request.active_company = company
         ctx = tenant_context(company)
         request._tenant_context = ctx
         ctx.__enter__()
+
 
     def process_exception(self, request, exception):
         if hasattr(request, "_tenant_context"):
@@ -109,14 +124,16 @@ class TenantMiddleware(MiddlewareMixin):
             except AuthenticationFailed:
                 pass
 
+        # ⬇️ Nuevo: JWT primero
         try:
-            pair = SessionAuthentication().authenticate(request)
+            pair = VersionedJWTAuthentication().authenticate(request)
             if pair:
                 request.user, request.auth = pair
                 return request.user
         except AuthenticationFailed:
             pass
 
+        # ⬇️ Luego tu Token actual (compatibilidad)
         try:
             pair = TokenAuthentication().authenticate(request)
             if pair:
@@ -126,6 +143,7 @@ class TenantMiddleware(MiddlewareMixin):
             pass
 
         return getattr(request, "user", None)
+
 
     def _parse_company_id(self, raw):
         if not raw or not raw.isdigit():

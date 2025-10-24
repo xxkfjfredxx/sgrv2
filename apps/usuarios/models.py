@@ -30,7 +30,7 @@ class UserRole(AuditMixin, models.Model):
 
 class User(AuditMixin, AbstractUser):
     email = models.EmailField(_('email address'), max_length=254, unique=True)
-
+    token_version = models.PositiveIntegerField(default=1)
     username = models.CharField(
         _('username'),
         max_length=150,
