@@ -2,10 +2,9 @@ from django.utils.deprecation import MiddlewareMixin
 from django.core.exceptions import PermissionDenied
 from rest_framework.exceptions import AuthenticationFailed
 from django_tenants.utils import tenant_context
-from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from apps.usuarios.auth import VersionedJWTAuthentication
 import logging
 
+from apps.usuarios.auth import VersionedJWTAuthentication
 from apps.empresa.models import Company
 
 try:
@@ -20,7 +19,7 @@ class TenantMiddleware(MiddlewareMixin):
     # Public endpoints (stay in public schema, no tenant_context)
     EXEMPT_PATHS = (
         "/api/auth/login",
-        "/api/auth/refresh",          # ⬅️ añadido
+        "/api/auth/refresh",
         "/api/auth/otp/request",
         "/api/auth/otp/verify",
         "/api/schema",
@@ -47,18 +46,16 @@ class TenantMiddleware(MiddlewareMixin):
         if any(request.path.startswith(p) for p in self.EXEMPT_PATHS):
             return None
 
-        # Autentica (JWT versionado -> Token legacy -> OAuth2)
+        # Autentica (JWT -> OAuth2). Legacy DRF TokenAuthentication eliminado.
         user = self._authenticate_request_user(request)
 
-        # Si NO está autenticado, NO lances 403 aquí:
-        # deja que DRF responda 401 en la vista (IsAuthenticated).
+        # Si NO está autenticado, deja que DRF responda 401 en la vista.
         if not getattr(user, "is_authenticated", False):
             return None
 
         # Endpoints admin que operan en public schema
         if any(request.path.startswith(p) for p in self.ADMIN_PUBLIC_PATHS):
             if not getattr(user, "is_superuser", False):
-                # Aquí sí corresponde 403: usuario autenticado pero sin permiso
                 raise PermissionDenied("Admin required")
             return None  # se queda en public schema
 
@@ -93,7 +90,6 @@ class TenantMiddleware(MiddlewareMixin):
         request._tenant_context = ctx
         ctx.__enter__()
 
-
     def process_exception(self, request, exception):
         if hasattr(request, "_tenant_context"):
             try:
@@ -112,9 +108,24 @@ class TenantMiddleware(MiddlewareMixin):
 
     # ---------- helpers ----------
     def _authenticate_request_user(self, request):
+        # Si ya viene autenticado, úsalo
         if getattr(request, "user", None) and getattr(request.user, "is_authenticated", False):
             return request.user
 
+        # 1) JWT versión (principal)
+        try:
+            pair = VersionedJWTAuthentication().authenticate(request)
+            if pair:
+                request.user, request.auth = pair
+                return request.user
+        except AuthenticationFailed:
+            pass
+        except Exception:
+            # No rompas el request por errores de cabeceras, etc.
+            logger.exception("JWT auth error")
+            pass
+
+        # 2) OAuth2 (opcional)
         if OAuth2Authentication is not None:
             try:
                 pair = OAuth2Authentication().authenticate(request)
@@ -123,27 +134,12 @@ class TenantMiddleware(MiddlewareMixin):
                     return request.user
             except AuthenticationFailed:
                 pass
+            except Exception:
+                logger.exception("OAuth2 auth error")
+                pass
 
-        # ⬇️ Nuevo: JWT primero
-        try:
-            pair = VersionedJWTAuthentication().authenticate(request)
-            if pair:
-                request.user, request.auth = pair
-                return request.user
-        except AuthenticationFailed:
-            pass
-
-        # ⬇️ Luego tu Token actual (compatibilidad)
-        try:
-            pair = TokenAuthentication().authenticate(request)
-            if pair:
-                request.user, request.auth = pair
-                return request.user
-        except AuthenticationFailed:
-            pass
-
+        # 3) Nada: usuario anónimo
         return getattr(request, "user", None)
-
 
     def _parse_company_id(self, raw):
         if not raw or not raw.isdigit():

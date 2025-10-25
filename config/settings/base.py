@@ -163,11 +163,11 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(getenv("JWT_ACCESS_MINUTES", "60"))),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=int(getenv("JWT_REFRESH_DAYS", "7"))),
     "AUTH_HEADER_TYPES": ("Bearer",),
-    # Actívalos cuando quieras rotación estricta:
-    "ROTATE_REFRESH_TOKENS": getenv("JWT_ROTATE_REFRESH", "false").lower() == "true",
-    "BLACKLIST_AFTER_ROTATION": getenv("JWT_BLACKLIST_AFTER_ROTATION", "false").lower() == "true",
+    "ROTATE_REFRESH_TOKENS": getenv("JWT_ROTATE_REFRESH", "true").lower() == "true",
+    "BLACKLIST_AFTER_ROTATION": getenv("JWT_BLACKLIST_AFTER_ROTATION", "true").lower() == "true",
     "UPDATE_LAST_LOGIN": True,
 }
+
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "SGR API",
