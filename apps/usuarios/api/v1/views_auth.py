@@ -1,21 +1,24 @@
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.tokens import RefreshToken
 from django_tenants.utils import tenant_context
+
 from apps.empresa.models import UserCompanyIndex  # public user->company index
 from apps.empleados.models import Employee
-from apps.usuarios.api.v1.serializers import LoginRequestSerializer, LogoutResponseSerializer, TokenResponseSerializer, UserSerializer
+from apps.usuarios.api.v1.serializers import (
+    LoginRequestSerializer,
+    LogoutResponseSerializer,
+    TokenResponseSerializer,
+    UserSerializer,
+)
 from apps.usuarios.auth import VersionedJWTAuthentication
 from drf_spectacular.utils import extend_schema, OpenApiResponse
-from rest_framework import serializers as drf_serializers
 from django.contrib.auth import logout as dj_logout
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
-# =========================
-# Vistas
-# =========================
+
+
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
@@ -50,7 +53,7 @@ class LoginView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        # --- Perfil/empresa exactamente como tenías ---
+        # --- Perfil/empresa ---
         if getattr(user, "is_superuser", False):
             user_data = {
                 "id": user.id,
@@ -89,10 +92,6 @@ class LoginView(APIView):
         user.token_version = (getattr(user, "token_version", 1) or 1) + 1
         user.save(update_fields=["token_version"])
 
-        # --- Token DRF legacy (compat) ---
-        Token.objects.filter(user=user).delete()
-        token = Token.objects.create(user=user)
-
         # --- Inicia sesión de Django (por si usas SessionAuth en admin) ---
         login(request, user)
 
@@ -104,7 +103,7 @@ class LoginView(APIView):
 
         return Response(
             {
-                "token": token.key,               # legacy (puedes retirarlo luego)
+                # 👇 Sin token legacy
                 "access": str(access),
                 "refresh": str(refresh),
                 "user": user_data,
@@ -113,6 +112,7 @@ class LoginView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
 
 class LogoutView(APIView):
     # Permitir sin auth para poder cerrar con solo el refresh (aunque el access ya no sirva)
@@ -134,31 +134,34 @@ class LogoutView(APIView):
                         BlacklistedToken.objects.get_or_create(token=ot)
                 except Exception:
                     pass
-                # ⬅️ Kill-switch: sube la versión para invalidar TODOS los access inmediatamente
+                # Kill-switch: sube la versión para invalidar TODOS los access inmediatamente
                 try:
                     user.token_version = (getattr(user, "token_version", 1) or 1) + 1
                     user.save(update_fields=["token_version"])
                 except Exception:
                     pass
-                # Limpia token DRF legacy
-                Token.objects.filter(user_id=user.id).delete()
 
         # (B) Cerrar UNA sesión por refresh concreto (NO depende de Authorization)
         if refresh_token:
             try:
                 rt = RefreshToken(refresh_token)   # valida que sea un refresh válido
-                uid = rt.get("user_id", None)
-                rt.blacklist()                     # invalida ese refresh
+                # Nota: usa payload.get(...) para evitar KeyError
+                uid = rt.payload.get("user_id")
+                # Si tienes blacklist habilitado en settings / app instalada:
+                try:
+                    rt.blacklist()
+                except Exception:
+                    # Si la blacklist no estuviera activa, no falles el logout
+                    pass
                 if uid:
-                    # ⬅️ Kill-switch: sube la versión del dueño de ese refresh => mata TODOS los access
+                    # Kill-switch del dueño de ese refresh => mata TODOS los access
                     from apps.usuarios.models import User
                     u = User.objects.filter(pk=uid).first()
                     if u:
                         u.token_version = (getattr(u, "token_version", 1) or 1) + 1
                         u.save(update_fields=["token_version"])
-                        Token.objects.filter(user_id=u.id).delete()
             except Exception:
-                # refresh inválido o ya blacklisteado -> idempotente, no revientes
+                # refresh inválido o ya blacklisteado -> idempotente
                 pass
 
         # (C) Cierra sesión de SessionAuth si hubiera
@@ -169,6 +172,7 @@ class LogoutView(APIView):
 
         # Idempotente: siempre 204 (sin cuerpo)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class MeView(APIView):
     permission_classes = [permissions.IsAuthenticated]
